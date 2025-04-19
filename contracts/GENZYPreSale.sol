@@ -49,6 +49,14 @@ contract GENZY_PRESALE is ReentrancyGuard, OwnerWithdrawable {
     // Mapping to check if an address has purchased tokens
     mapping(address => bool) public hasPurchased;
 
+    // Events
+    event TokensPurchased(address indexed buyer, address indexed paymentToken, uint256 paymentAmount, uint256 tokenAmount);
+    event SaleTokenParamsSet(address indexed saleToken, uint256 totalTokens);
+    event TokenWhitelisted(address indexed token, uint256 price);
+    event TokenRateUpdated(address indexed token, uint256 newPrice);
+    event EthRateUpdated(uint256 newRate);
+    event PresaleStateChanged(bool newState);
+
     // Public function to execute the purchase of tokens. Approval must be done beforehand.
     function execute(address _token, uint256 _amount) external payable nonReentrant {
         require(isPresaleStarted, "PreSale: Sale stopped!"); // Ensure presale is active
@@ -83,6 +91,13 @@ contract GENZY_PRESALE is ReentrancyGuard, OwnerWithdrawable {
 
         totalTokensSold += saleTokenAmount; // Update total tokens sold
         presaleData[msg.sender] += saleTokenAmount; // Record purchase for the sender
+
+        emit TokensPurchased(
+            msg.sender,
+            _token,
+            _token != address(0) ? _amount : msg.value,
+            saleTokenAmount
+        );
     }
 
     // Function to set the parameters for the sale token
@@ -93,6 +108,8 @@ contract GENZY_PRESALE is ReentrancyGuard, OwnerWithdrawable {
 
         // Transfer the tokens from owner to this contract
         IERC20(saleToken).safeTransferFrom(msg.sender, address(this), _totalTokensforSale);
+
+        emit SaleTokenParamsSet(_saleToken, _totalTokensforSale);
     }
 
     // Add a token to the whitelist with its price
@@ -100,11 +117,14 @@ contract GENZY_PRESALE is ReentrancyGuard, OwnerWithdrawable {
         require(_price != 0, "Presale: Cannot set price to 0");
         tokenWhitelist[_token] = true; // Mark token as whitelisted
         tokenPrices[_token] = _price; // Set price for the whitelisted token
+
+        emit TokenWhitelisted(_token, _price);
     }
 
     // Update the rate for purchasing with native currency
     function updateEthRate(uint256 _rate) external onlyOwner {
         rate = _rate;
+        emit EthRateUpdated(_rate);
     }
 
     // Update the price for a whitelisted token
@@ -112,11 +132,14 @@ contract GENZY_PRESALE is ReentrancyGuard, OwnerWithdrawable {
         require(tokenWhitelist[_token], "Presale: Token not whitelisted");
         require(_price != 0, "Presale: Cannot set price to 0");
         tokenPrices[_token] = _price; // Update price for the specified token
+
+        emit TokenRateUpdated(_token, _price);
     }
 
     // Toggle the presale state (started or stopped)
     function togglePresale(bool _state) external onlyOwner {
         isPresaleStarted = _state;
+        emit PresaleStateChanged(_state);
     }
 
     // Public view function to calculate the amount of sale tokens received for a given amount of a specific token
